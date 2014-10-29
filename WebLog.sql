@@ -1,7 +1,7 @@
 USE [WebLog]
 GO
 
-/****** Object:  Table [dbo].[Event]    Script Date: 09/18/2014 21:18:07 ******/
+/****** Object:  Table [dbo].[Event]    Script Date: 10/29/2014 18:47:21 ******/
 SET ANSI_NULLS ON
 GO
 
@@ -34,6 +34,9 @@ CREATE TABLE [dbo].[Event](
 	[cs-host] [varchar](512) NULL,
 	[cs(User-Agent)] [varchar](max) NULL,
 	[cs(Referer)] [varchar](max) NULL,
+	[datetime]  AS (dateadd(day,datediff(day,'19000101',[date]),CONVERT([datetimeoffset](7),[time],(0)))),
+	[x-session] [varchar](max) NULL,
+	[x-fullpath] [varchar](max) NULL,
  CONSTRAINT [PK_Event] PRIMARY KEY NONCLUSTERED 
 (
 	[ID] ASC
@@ -48,7 +51,7 @@ GO
 USE [WebLog]
 GO
 
-/****** Object:  Table [dbo].[File]    Script Date: 09/18/2014 21:18:07 ******/
+/****** Object:  Table [dbo].[File]    Script Date: 10/29/2014 18:47:21 ******/
 SET ANSI_NULLS ON
 GO
 
@@ -58,8 +61,9 @@ GO
 CREATE TABLE [dbo].[File](
 	[Id] [bigint] IDENTITY(1,1) NOT NULL,
 	[Name] [nvarchar](max) NOT NULL,
-	[Updated] [datetime] NOT NULL,
-	[Scanned] [datetime] NULL,
+	[Created] [datetimeoffset](7) NOT NULL,
+	[Updated] [datetimeoffset](7) NOT NULL,
+	[Scanned] [datetimeoffset](7) NULL,
 	[BytesRead] [bigint] NOT NULL,
 	[LastFields] [nvarchar](max) NULL,
 	[EventCount] [int] NOT NULL,
@@ -74,7 +78,7 @@ GO
 USE [WebLog]
 GO
 
-/****** Object:  Table [dbo].[GeoData]    Script Date: 09/18/2014 21:18:07 ******/
+/****** Object:  Table [dbo].[GeoData]    Script Date: 10/29/2014 18:47:21 ******/
 SET ANSI_NULLS ON
 GO
 
@@ -111,7 +115,7 @@ GO
 USE [WebLog]
 GO
 
-/****** Object:  Table [dbo].[UserAgent]    Script Date: 09/18/2014 21:18:07 ******/
+/****** Object:  Table [dbo].[UserAgent]    Script Date: 10/29/2014 18:47:21 ******/
 SET ANSI_NULLS ON
 GO
 
@@ -162,4 +166,5 @@ GO
 
 ALTER TABLE [dbo].[UserAgent] ADD  DEFAULT (getdate()) FOR [date_added]
 GO
+
 

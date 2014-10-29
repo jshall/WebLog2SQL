@@ -10,7 +10,7 @@ namespace WebLog2SQL
         [Option("database", DefaultValue = @"Data Source=.\SQLEXPRESS;Initial Catalog=WebLog;Integrated Security=True")]
         public string ConnectionString { get; set; }
 
-        private static DateTime _loaded = DateTime.UtcNow;
+        private static DateTime _loaded = DateTime.Now;
         [Option('d', "days", DefaultValue = 60, HelpText = "Number of days to import.")]
         public int days { get; set; }
         public DateTime MaxAge { get { return _loaded.AddDays(-days); } }

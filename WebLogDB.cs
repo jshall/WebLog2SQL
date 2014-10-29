@@ -5,7 +5,9 @@ using System.Data.SqlClient;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Web.Script.Serialization;
+using System.Threading.Tasks;
 
 namespace WebLog2SQL
 {
@@ -13,42 +15,65 @@ namespace WebLog2SQL
     {
         public WebLogDB() : this(Program.Settings.ConnectionString) { }
 
+        private static bool isUpUA = true;
         private static JavaScriptSerializer json = new JavaScriptSerializer();
         internal void ImportUA(IEnumerable<string> UAStrings)
         {
-            UAStrings = from UAS in UAStrings.Distinct()
+            if (isUpUA)
+            {
+                try
+                {
+                    Parallel.ForEach(
+                        from UAS in UAStrings.Distinct()
                         join ua in UserAgents on UAS equals ua.agent_string into l
                         where !l.Any() && !string.IsNullOrWhiteSpace(UAS)
-                        select UAS;
-            foreach (var UAS in UAStrings)
-            {
-                var data = new System.Net.WebClient()
-                              .DownloadString("http://www.useragentstring.com/?getJSON=all&uas=" + UAS)
-                              .Replace("\"\"", "null")
-                              .Replace("\"unknown\"", "null");
-                var ua = json.Deserialize<UserAgent>(data);
-                ua.agent_string = UAS;
-                ua.agent_name = ua.agent_name ?? UAS.Replace('+', ' ');
-                UserAgents.InsertOnSubmit(ua);
+                        select UAS,
+                    (UAS) =>
+                    {
+                        var data = new System.Net.WebClient()
+                                      .DownloadString("http://www.useragentstring.com/?getJSON=all&uas=" + UAS)
+                                      .Replace("\"\"", "null")
+                                      .Replace("\"unknown\"", "null");
+                        var ua = json.Deserialize<UserAgent>(data);
+                        ua.agent_string = UAS;
+                        ua.agent_name = ua.agent_name ?? UAS.Replace('+', ' ');
+                        UserAgents.InsertOnSubmit(ua);
+                    });
+                }
+                catch { isUpUA = false; }
+                SubmitChanges();
             }
-            SubmitChanges();
         }
+
+        private static bool isUpGeo = true;
+        private static Regex IPv4 = new Regex(@"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}");
         internal void ImportGeo(IEnumerable<string> IPs)
         {
-            IPs = from IP in IPs.Distinct()
-                  join g in GeoDatas on IP equals g.ip into l
-                  where !l.Any() && !string.IsNullOrWhiteSpace(IP)
-                  select IP;
-            foreach (var IP in IPs)
+            if (isUpGeo)
             {
-                var data = new System.Net.WebClient()
-                              .DownloadString("http://freegeoip.net/json/" + IP)
-                              .Replace("\"\"", "null")
-                              .Replace("\"unknown\"", "null");
-                var geo = json.Deserialize<GeoData>(data);
-                GeoDatas.InsertOnSubmit(geo);
+                try
+                {
+                    Parallel.ForEach(
+                        from IP in IPs.Distinct()
+                        join g in GeoDatas on IP equals g.ip into l
+                        where !l.Any() && !string.IsNullOrWhiteSpace(IP)
+                        select IP,
+                    (IP) =>
+                    {
+                        if (IPv4.IsMatch(IP))
+                        {
+                            var data = new System.Net.WebClient()
+                                          .DownloadString("http://freegeoip.net/json/" + IP)
+                                          .Replace("\"\"", "null")
+                                          .Replace("\"unknown\"", "null");
+                            var geo = json.Deserialize<GeoData>(data);
+                            GeoDatas.InsertOnSubmit(geo);
+                        }
+                    });
+                }
+                catch { isUpGeo = false; }
+                SubmitChanges();
             }
-            SubmitChanges();
         }
     }
 
@@ -73,14 +98,14 @@ namespace WebLog2SQL
         public static File from(FileInfo info)
         {
             var file = list.FirstOrDefault(f => f.Name == info.FullName)
-                     ?? new File { Name = info.FullName };
+                     ?? new File { Name = info.FullName, Created = info.CreationTime };
             using (var ctx = new WebLogDB())
             {
                 if (file.Id == 0)
                     ctx.Files.InsertOnSubmit(file);
                 else
                     ctx.Files.Attach(file);
-                file.Updated = info.LastWriteTimeUtc;
+                file.Updated = info.LastWriteTime;
                 ctx.SubmitChanges();
             }
             file._file = info;
@@ -169,7 +194,7 @@ namespace WebLog2SQL
 
         protected void Update()
         {
-            Scanned = DateTime.UtcNow;
+            Scanned = DateTime.Now;
             using (var ctx = new WebLogDB())
                 lock (_evtFlds)
                 {

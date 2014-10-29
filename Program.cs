@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -28,13 +29,20 @@ namespace WebLog2SQL
                 foreach (var dir in Settings.Include)
                     if (Directory.Exists(dir))
                         new DirectoryInfo(dir).Search(files);
-                files = files.Distinct()
-                             .Where(f => f.LastWriteTimeUtc > Settings.MaxAge)
-                             .OrderByDescending(f => f.LastWriteTimeUtc)
-                             .ToList();
+                var q = new ConcurrentQueue<FileInfo>(
+                    files.Distinct()
+                         .Where(f => f.LastWriteTime > Settings.MaxAge)
+                         .OrderByDescending(f => f.LastWriteTime)
+                );
 
                 Console.WriteLine("Processing files...");
-                Parallel.ForEach(files, new ParallelOptions { MaxDegreeOfParallelism = 80 }, file => File.from(file).Import());
+                Parallel.Invoke(
+                    Enumerable.Repeat<Action>(() =>
+                        {
+                            FileInfo file;
+                            while (q.TryDequeue(out file))
+                                File.from(file).Import();
+                        }, Environment.ProcessorCount).ToArray());
             }
             catch (Exception ex) { Debug.WriteLine(ex); }
         }

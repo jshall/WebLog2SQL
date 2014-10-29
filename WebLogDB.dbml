@@ -3,8 +3,9 @@
     <Type Name="File" AccessModifier="Internal">
       <Column Name="Id" Type="System.Int64" DbType="BigInt NOT NULL IDENTITY" IsPrimaryKey="true" IsDbGenerated="true" CanBeNull="false" />
       <Column Name="Name" Type="System.String" DbType="NVarChar(MAX) NOT NULL" CanBeNull="false" />
-      <Column Name="Updated" Type="System.DateTime" DbType="DateTime NOT NULL" CanBeNull="false" />
-      <Column Name="Scanned" Type="System.DateTime" DbType="DateTime NOT NULL" CanBeNull="true" />
+      <Column Name="Created" Type="System.DateTimeOffset" DbType="DateTimeOffset NOT NULL" CanBeNull="false" />
+      <Column Name="Updated" Type="System.DateTimeOffset" DbType="DateTimeOffset NOT NULL" CanBeNull="false" />
+      <Column Name="Scanned" Type="System.DateTimeOffset" DbType="DateTimeOffset" CanBeNull="true" />
       <Column Name="BytesRead" Type="System.Int64" DbType="BigInt NOT NULL" CanBeNull="false" />
       <Column Name="LastFields" Type="System.String" DbType="NVarChar(MAX)" CanBeNull="true" />
       <Column Name="EventCount" Type="System.Int32" DbType="Int NOT NULL" CanBeNull="false" />
