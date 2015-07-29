@@ -1,6 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -11,10 +11,12 @@ namespace WebLog2SQL
 {
     public static class Program
     {
-        internal static Options Settings = new Options();
-        public static void Main(string[] args)
+        internal static readonly Options Settings = new Options();
+        private static ConcurrentQueue<FileInfo> _q;
+        private static void Consume() { FileInfo file; while (_q.TryDequeue(out file)) File.From(file).Import(); }
+        public static void Main(string[] arguments)
         {
-            Parser.Default.ParseArgumentsStrict(args, Settings);
+            Parser.Default.ParseArgumentsStrict(arguments, Settings);
             try
             {
                 if (Settings.Clean)
@@ -29,27 +31,21 @@ namespace WebLog2SQL
                 foreach (var dir in Settings.Include)
                     if (Directory.Exists(dir))
                         new DirectoryInfo(dir).Search(files);
-                var q = new ConcurrentQueue<FileInfo>(
+                _q = new ConcurrentQueue<FileInfo>(
                     files.Distinct()
                          .Where(f => f.LastWriteTime > Settings.MaxAge)
-                         .OrderByDescending(f => f.LastWriteTime)
+                         .OrderBy(f => f.LastWriteTime)
                 );
 
                 Console.WriteLine("Processing files...");
-                Parallel.Invoke(
-                    Enumerable.Repeat<Action>(() =>
-                        {
-                            FileInfo file;
-                            while (q.TryDequeue(out file))
-                                File.from(file).Import();
-                        }, Environment.ProcessorCount).ToArray());
+                Parallel.Invoke(Enumerable.Repeat((Action)Consume, Environment.ProcessorCount).ToArray());
             }
-            catch (Exception ex) { Debug.WriteLine(ex); }
+            catch (Exception ex) { Debug.WriteLine(ex); throw; }
         }
 
         private static void Search(this DirectoryInfo dir, List<FileInfo> files)
         {
-            if (Settings.Exclude.Intersect(new[] { dir.FullName, dir.Name }).Any()) return;
+            if (Settings.Exclude != null && Settings.Exclude.Intersect(new[] { dir.FullName, dir.Name }).Any()) return;
             foreach (var sub in dir.GetDirectories())
                 sub.Search(files);
             files.AddRange(dir.GetFiles(Settings.Filter, SearchOption.TopDirectoryOnly));

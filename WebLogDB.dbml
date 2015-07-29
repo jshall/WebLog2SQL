@@ -11,34 +11,4 @@
       <Column Name="EventCount" Type="System.Int32" DbType="Int NOT NULL" CanBeNull="false" />
     </Type>
   </Table>
-  <Table Name="dbo.UserAgent" Member="UserAgents" AccessModifier="Internal">
-    <Type Name="UserAgent" AccessModifier="Internal">
-      <Column Name="agent_string" Type="System.String" DbType="VarChar(1024) NOT NULL" IsPrimaryKey="true" CanBeNull="false" />
-      <Column Name="agent_type" Type="System.String" DbType="VarChar(50)" CanBeNull="true" />
-      <Column Name="agent_name" Type="System.String" DbType="VarChar(1024) NOT NULL" CanBeNull="false" />
-      <Column Name="agent_version" Type="System.String" DbType="VarChar(50)" CanBeNull="true" />
-      <Column Name="os_type" Type="System.String" DbType="VarChar(50)" CanBeNull="true" />
-      <Column Name="os_name" Type="System.String" DbType="VarChar(50)" CanBeNull="true" />
-      <Column Name="os_versionName" Type="System.String" DbType="VarChar(50)" CanBeNull="true" />
-      <Column Name="os_versionNumber" Type="System.String" DbType="VarChar(50)" CanBeNull="true" />
-      <Column Name="linux_distribution" Type="System.String" DbType="VarChar(50)" CanBeNull="true" />
-      <Column Name="date_added" AutoSync="Never" Type="System.DateTime" DbType="DateTime NOT NULL" IsDbGenerated="true" CanBeNull="false" />
-    </Type>
-  </Table>
-  <Table Name="dbo.GeoData" Member="GeoDatas" AccessModifier="Internal">
-    <Type Name="GeoData" AccessModifier="Internal">
-      <Column Name="ip" Type="System.String" DbType="VarChar(50) NOT NULL" IsPrimaryKey="true" CanBeNull="false" />
-      <Column Name="country_code" Type="System.String" DbType="Char(2)" CanBeNull="true" />
-      <Column Name="country_name" Type="System.String" DbType="NVarChar(100)" CanBeNull="true" />
-      <Column Name="region_code" Type="System.String" DbType="Char(2)" CanBeNull="true" />
-      <Column Name="region_name" Type="System.String" DbType="NVarChar(100)" CanBeNull="true" />
-      <Column Name="city" Type="System.String" DbType="NVarChar(100)" CanBeNull="true" />
-      <Column Name="zipcode" Type="System.String" DbType="VarChar(20)" CanBeNull="true" />
-      <Column Name="latitude" Type="System.Single" DbType="Real" CanBeNull="true" />
-      <Column Name="longitude" Type="System.Single" DbType="Real" CanBeNull="true" />
-      <Column Name="metro_code" Type="System.Int32" DbType="Int" CanBeNull="true" />
-      <Column Name="area_code" Type="System.Int32" DbType="Int" CanBeNull="true" />
-      <Column Name="date_added" AutoSync="Never" Type="System.DateTime" DbType="DateTime NOT NULL" IsDbGenerated="true" CanBeNull="false" />
-    </Type>
-  </Table>
 </Database>
