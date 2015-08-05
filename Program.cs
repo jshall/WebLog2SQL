@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 using CommandLine;
 
@@ -14,6 +15,8 @@ namespace WebLog2SQL
         internal static readonly Options Settings = new Options();
         private static ConcurrentQueue<FileInfo> _q;
         private static void Consume() { FileInfo file; while (_q.TryDequeue(out file)) File.From(file).Import(); }
+
+        static Program() { Parser.Default.ParseArguments(new string[] { }, Settings); }
         public static void Main(string[] arguments)
         {
             Parser.Default.ParseArgumentsStrict(arguments, Settings);
@@ -22,8 +25,32 @@ namespace WebLog2SQL
                 if (Settings.Clean)
                 {
                     Console.WriteLine("Removing old data...");
-                    using (var ctx = new WebLogDB { CommandTimeout = 600 })
-                        ctx.ExecuteCommand("delete [File] where [Updated] < {0}", Settings.MaxAge);
+                    using (var ctx = new WebLogDB())
+                    {
+                        ctx.Database.CommandTimeout = 600;
+                        ctx.Database.ExecuteSqlCommand(
+                            "IF OBJECT_ID('dbo.Events') IS NULL " +
+                                "BEGIN " +
+                                    "CREATE TABLE [dbo].[Events] (" +
+                                        "[Id] UNIQUEIDENTIFIER NOT NULL DEFAULT NEWID()," +
+                                        "[FileId] BIGINT NOT NULL," +
+                                        "[datetime] AS dateadd(day,datediff(day,'19000101',[date]),CONVERT([datetimeoffset](7),[time],(0)))," +
+                                        "[date] DATE NOT NULL," +
+                                        "[time] TIME(7) NOT NULL," +
+                                        "[cs-bytes] INT NULL," +
+                                        "[s-port] INT NULL," +
+                                        "[sc-status] INT NULL," +
+                                        "[sc-substatus] INT NULL," +
+                                        "[sc-win32-status] BIGINT NULL," +
+                                        "[sc-bytes] INT NULL," +
+                                        "[time-taken] INT NULL " +
+                                        "PRIMARY KEY NONCLUSTERED ([Id])" +
+                                        "FOREIGN KEY ([FileId]) REFERENCES [dbo].[Files] ([Id]) ON DELETE CASCADE);" +
+                                    "CREATE CLUSTERED INDEX [IX_EventOrder] " +
+                                        "ON [dbo].[Events]([FileID] ASC, [date] ASC, [time] ASC);" +
+                                "END " +
+                            "DELETE Files WHERE Updated < {0}", Settings.MaxAge);
+                    }
                 }
 
                 Console.WriteLine("Locating files...");
@@ -54,11 +81,11 @@ namespace WebLog2SQL
         internal static object GetField(this object obj, string name)
         {
             return obj.GetType().InvokeMember(name,
-                System.Reflection.BindingFlags.DeclaredOnly |
-                System.Reflection.BindingFlags.Public |
-                System.Reflection.BindingFlags.NonPublic |
-                System.Reflection.BindingFlags.Instance |
-                System.Reflection.BindingFlags.GetField,
+                BindingFlags.DeclaredOnly |
+                BindingFlags.Public |
+                BindingFlags.NonPublic |
+                BindingFlags.Instance |
+                BindingFlags.GetField,
                 null, obj, null);
         }
     }

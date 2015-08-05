@@ -1,60 +1,87 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Data.Entity;
 using System.Data.SqlClient;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Text.RegularExpressions;
+using System.Text;
+using WebLog2SQL.Migrations;
 
 namespace WebLog2SQL
 {
-    internal partial class WebLogDB { public WebLogDB() : this(Program.Settings.ConnectionString) { } }
+    internal class WebLogDB : DbContext
+    {
+        public WebLogDB()
+            : base(Program.Settings.ConnectionString)
+        {
+            Database.SetInitializer(new MigrateDatabaseToLatestVersion<WebLogDB, Configuration>());
+        }
+        public DbSet<File> Files { get; set; }
+    }
+
     internal partial class File
     {
-        private static readonly List<File> List;
         static File()
         {
-            using (var db = new SqlConnection(Program.Settings.ConnectionString))
+            using (var ctx = new WebLogDB())
             {
+                var db = ctx.Database.Connection;
                 db.Open();
                 EventFieldList = db
-                    .GetSchema("Columns", new[] { null, null, "Event" })
+                    .GetSchema("Columns", new[] { null, null, "Events" })
                     .AsEnumerable()
                     .Select(c => c["COLUMN_NAME"] as string)
                     .ToList();
-                using (var ctx = new WebLogDB(db))
-                    List = ctx.Files.ToList();
             }
         }
 
+        private WebLogDB _ctx;
         public static File From(FileInfo info)
         {
-            var file = List.FirstOrDefault(f => f.Name == info.FullName)
-                     ?? new File { Name = info.FullName, Created = info.CreationTime };
-            using (var ctx = new WebLogDB())
+            lock (EventFieldList)
             {
-                if (file.Id == 0)
-                    ctx.Files.InsertOnSubmit(file);
-                else
-                    ctx.Files.Attach(file);
+                var ctx = new WebLogDB();
+                var file = ctx.Files.SingleOrDefault(f => f.Name == info.FullName)
+                           ?? new File { Name = info.FullName, Created = info.CreationTime };
                 file.Updated = info.LastWriteTime;
-                ctx.SubmitChanges();
+                ctx.Files.Add(file);
+                ctx.SaveChanges();
+                file._ctx = ctx;
+                file._file = info;
+                return file;
             }
-            file._file = info;
-            return file;
         }
 
-        private static readonly Regex ValueRegex = new Regex(@"[\S-[""]]+|""((?:[^""]|(?<=\\)"")*)""", RegexOptions.Compiled);
         private static IEnumerable<string> Values(string str)
         {
-            var match = ValueRegex.Match(str ?? "");
-            while (match.Success)
+            var tmp = new StringBuilder(100, 4000);
+        restart:
+            var ignore = false;
+            for (var i = 0; i < str.Length; i++)
+                if (str[i] != '"' && (ignore || str[i] != ' '))
+                    tmp.Append(str[i]);
+                else if (str[i] == ' ')
+                {
+                    yield return tmp.ToString();
+                    tmp.Clear();
+                }
+                else if (tmp.Length == 0)
+                    ignore = true;
+                else if (i + 1 == str.Length || str[i + 1] == ' ')
+                    ignore = false;
+                else if (str[i + 1] == '"')
+                    tmp.Append(str[i++]);
+                else
+                    tmp.Append(str[i]);
+            if (ignore)
             {
-                var val = match.Value.Trim('"');
-                yield return val == "-" ? null : val.Length > 4000 ? val.Substring(0, 3997) + "..." : val;
-                match = match.NextMatch();
+                str = tmp.ToString();
+                tmp.Clear().Append('"');
+                goto restart;
             }
+            yield return tmp.ToString();
         }
 
         private FileInfo _file;
@@ -76,23 +103,26 @@ namespace WebLog2SQL
                     {
                         var line = txt.ReadLine() ?? "";
                         BytesRead = stream.Position + (int)txt.GetField("charPos") - (int)txt.GetField("charLen");
-                        var values = Values(line).ToArray();
+                        var values = Values(line.Trim(' ')).ToArray();
                         if (values[0] == "#Fields:" && LastFields != line.Substring(9))
                         {
-                            LastFields = line.Substring(9);
+                            LastFields = line.Substring(8).Trim(' ');
                             Prepare();
                         }
+                        // ReSharper disable once RedundantJumpStatement
                         else if (line[0] == '#') continue;
                         else if (_buffer != null && values.Length + 1 == _buffer.Columns.Count)
                         {
+                            // ReSharper disable once CoVariantArrayConversion
                             _buffer.Rows.Add(values);
                             if (_buffer != null && _buffer.Rows.Count == 10000)
                                 Prepare();
                         }
                         else Debug.WriteLine("{0}:{1} Could not parse: {2}", _file.FullName, lineCount, line);
                     }
-                    Update(_buffer);
+                    Update();
                 }
+                _ctx.Dispose();
             }
             catch (Exception ex) { Debug.WriteLine("{0}:{1} {2}", _file.FullName, lineCount, ex); }
         }
@@ -100,51 +130,46 @@ namespace WebLog2SQL
         private static readonly List<string> EventFieldList;
         private void Prepare()
         {
-            new System.Threading.Thread(Update).Start(_buffer);
+            Update();
             var fields = Values(LastFields).ToArray();
             lock (EventFieldList)
             {
                 var add = fields.Except(EventFieldList).ToArray();
                 if (add.Any())
                 {
-                    using (var ctx = new WebLogDB())
-                        ctx.ExecuteCommand("ALTER TABLE [Event] ADD " +
-                            string.Join(", ", add.Select(f => string.Format("[{0}] nvarchar(4000) NULL", f))));
+                    _ctx.Database.ExecuteSqlCommand("ALTER TABLE Events ADD " +
+                        string.Join(", ", add.Select(f => string.Format("[{0}] nvarchar(4000) NULL", f))));
                     EventFieldList.AddRange(add);
                 }
             }
             _buffer = new DataTable();
             foreach (var f in fields)
                 _buffer.Columns.Add(f, typeof(string));
-            _buffer.Columns.Add("FileID", typeof(long), Id.ToString());
+            _buffer.Columns.Add("FileId", typeof(long), Id.ToString());
         }
 
-        private void Update(object state)
+        private void Update()
         {
-            var data = (DataTable)state;
             Scanned = DateTime.Now;
-            using (var ctx = new WebLogDB())
-                lock (EventFieldList)
-                {
-                    if (data != null)
-                        using (var bulkCopy = new SqlBulkCopy((SqlConnection)ctx.Connection))
-                        {
-                            bulkCopy.BulkCopyTimeout = 300;
-                            bulkCopy.DestinationTableName = "Event";
-                            foreach (DataColumn col in data.Columns)
-                                bulkCopy.ColumnMappings.Add(col.ColumnName, col.ColumnName);
-                            if (ctx.Connection.State != ConnectionState.Open)
-                                ctx.Connection.Open();
-                            bulkCopy.WriteToServer(data);
-                            if (Program.Settings.Verbose)
-                                Console.WriteLine("Imported {0,6:#,##0} events from {1}.", data.Rows.Count, _file.FullName);
-                            EventCount += data.Rows.Count;
-                            data.Dispose();
-                        }
-                    ctx.ExecuteCommand(
-                        "update [File] set LastFields={1}, BytesRead={2}, EventCount={3}, Scanned={4} where ID={0}",
-                        _Id, _LastFields, _BytesRead, _EventCount, _Scanned);
-                }
+            lock (EventFieldList)
+            {
+                if (_buffer != null)
+                    using (var bulkCopy = new SqlBulkCopy((SqlConnection)_ctx.Database.Connection))
+                    {
+                        bulkCopy.BulkCopyTimeout = 300;
+                        bulkCopy.DestinationTableName = "Events";
+                        foreach (DataColumn col in _buffer.Columns)
+                            bulkCopy.ColumnMappings.Add(col.ColumnName, col.ColumnName);
+                        if (_ctx.Database.Connection.State != ConnectionState.Open)
+                            _ctx.Database.Connection.Open();
+                        bulkCopy.WriteToServer(_buffer);
+                        if (Program.Settings.Verbose)
+                            Console.WriteLine("Imported {0,6:#,##0} events from {1}.", _buffer.Rows.Count, _file.FullName);
+                        EventCount += _buffer.Rows.Count;
+                        _buffer.Dispose();
+                    }
+                _ctx.SaveChanges();
+            }
         }
     }
 }
