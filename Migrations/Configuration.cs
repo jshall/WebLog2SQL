@@ -1,4 +1,5 @@
 using System.Data.Entity.Migrations;
+using System.Linq;
 
 namespace WebLog2SQL.Migrations
 {
@@ -16,14 +17,14 @@ namespace WebLog2SQL.Migrations
 
             //  You can use the DbSet<T>.AddOrUpdate() helper extension method 
             //  to avoid creating duplicate seed data. E.g.
-            //
-            //    context.People.AddOrUpdate(
-            //      p => p.FullName,
-            //      new Person { FullName = "Andrew Peters" },
-            //      new Person { FullName = "Brice Lambson" },
-            //      new Person { FullName = "Rowan Miller" }
-            //    );
-            //
+
+            if (!context.Locations.Any())
+                context.Locations.AddRange(new[]{
+                    new Location { Name = "DILITHIUM", Root = @"\\DILITHIUM2\Web\Logfiles", DaysToKeep = 7 },
+                    new Location { Name = "TAN", Root = @"\\TAN\C$\inetpub\logs\LogFiles", DaysToKeep = 7 },
+                    new Location { Name = "CARBONITE", Root = @"\\CARBONITE\c$\inetpub\logs\logfiles", DaysToKeep = 7 },
+                    new Location { Name = "KRYPTONITE", Root = @"\\KRYPTONITE\d$\iis_logfiles", DaysToKeep = 7 }
+                });
         }
     }
 }
