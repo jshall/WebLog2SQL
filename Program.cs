@@ -50,7 +50,17 @@ namespace WebLog2SQL
                 if (!Settings.Keep)
                 {
                     Console.WriteLine("Removing old data...");
-                    ctx.Database.ExecuteSqlCommand("DELETE Files FROM Files JOIN Locations ON LocationName = Locations.Name AND Updated < GETDATE()-DaysToKeep");
+                    const string sql = "SELECT Files.* FROM Files " +
+                                       "JOIN Locations ON LocationName = Locations.Name " +
+                                       "AND DATEDIFF(d, Updated, GETDATE()) > DaysToKeep " +
+                                       "ORDER BY Files.Id";
+                    foreach (var file in ctx.Files.SqlQuery(sql).ToArray())
+                    {
+                        if (Settings.Verbose)
+                            Console.WriteLine("  {0}:{1}:{2}", file.LocationName, file.Path, file.Name);
+                        ctx.Files.Remove(file);
+                        ctx.SaveChanges();
+                    }
                 }
 
                 Console.WriteLine("Locating files...");
