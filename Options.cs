@@ -5,14 +5,14 @@ namespace WebLog2SQL
 {
     internal class Options
     {
-        [Option("db", DefaultValue = @"Server=(localdb)\v11.0;Database=WebLog", HelpText = "ConnectionString for the SQL database.")]
+        [Option("db", DefaultValue = @"Server=(localdb)\MSSQLLocalDB;Database=WebLog", HelpText = "ConnectionString for the SQL database.")]
         public string ConnectionString { get; set; }
 
-        [Option('k', "keep", HelpText = "Keep files updated outside the 'DaysToKeep'.")]
+        [Option('k', "keep", HelpText = "Do not delete any existing entries.")]
         public bool Keep { get; set; }
 
-        [Option('v', "verbose")]
-        public bool Verbose { get; set; }
+        [Option('b', "BufferSize", DefaultValue = 10000)]
+        public int BufferSize { get; set; }
 
         [HelpOption]
         public string GetUsage()

@@ -3,7 +3,8 @@ using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.IO;
 using System.Linq;
-using FileHook = System.Tuple<WebLog2SQL.Location, System.IO.FileInfo>;
+using System.Text.RegularExpressions;
+using NLog;
 
 namespace WebLog2SQL
 {
@@ -19,26 +20,23 @@ namespace WebLog2SQL
 
         public virtual ICollection<File> Files { get; set; }
 
-        private string[] _list;
         private DateTimeOffset _cutoff;
-        public IEnumerable<FileHook> Search()
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+
+        public IEnumerable<FileInfo> GetFiles()
         {
             var dir = new DirectoryInfo(Root);
-            if (!dir.Exists) yield break;
-            _cutoff = DateTime.Now.AddDays(0 - DaysToKeep);
-            _list = (Exclude ?? "").Split(',').Select(x => x.Trim()).ToArray();
-            foreach (var hook in Search(dir))
-                yield return hook;
-        }
-        private IEnumerable<FileHook> Search(DirectoryInfo dir)
-        {
-            foreach (var hook in dir.GetDirectories()
-                                    .Where(d => !_list.Contains(d.Name))
-                                    .SelectMany(Search))
-                yield return hook;
-            foreach (var file in dir.GetFiles(Filter ?? "*.log", SearchOption.TopDirectoryOnly)
-                                    .Where(file => file.LastWriteTime > _cutoff))
-                yield return new FileHook(this, file);
+            if (!dir.Exists)
+            {
+                Logger.Warn("Directory not found: {0}", dir.FullName);
+                return new FileInfo[] { };
+            }
+            _cutoff = DateTime.Now.AddDays(-DaysToKeep);
+            var ex = string.IsNullOrWhiteSpace(Exclude) ? null
+                : new Regex(Exclude, RegexOptions.Compiled | RegexOptions.IgnoreCase);
+            return dir.EnumerateFiles(Filter ?? "*.log", SearchOption.AllDirectories)
+                      .Where(file => file.LastWriteTime > _cutoff)
+                      .Where(file => !(ex?.Match(file.FullName).Success ?? false));
         }
     }
 }
