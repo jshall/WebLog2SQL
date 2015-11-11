@@ -21,7 +21,7 @@ namespace WebLog2SQL
                 using (var ctx = new WebLogDB())
                 {
                     ctx.Database.Connection.Open();
-                    Logger.Warn("Preparing Events Table");
+                    Logger.Debug("Preparing Events Table");
                     ctx.Database.ExecuteSqlCommand(
                         "IF OBJECT_ID('dbo.Events') IS NULL " +
                             "BEGIN " +
@@ -94,7 +94,7 @@ namespace WebLog2SQL
             {
                 line = line.Trim();
                 var tmp = new StringBuilder(100, 4000);
-                restart:
+            restart:
                 var ignore = false;
                 for (var i = 0; i < line.Length; i++)
                     if (line[i] != '"' && (ignore || line[i] != ' '))

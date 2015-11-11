@@ -30,14 +30,13 @@ namespace WebLog2SQL
                     locations = ctx.Locations.ToArray();
                     if (!Settings.Keep)
                     {
-                        Logger.Warn("Removing old Files and their events");
                         const string sql = "SELECT Files.* FROM Files " +
                                            "JOIN Locations ON LocationName = Locations.Name " +
                                            "AND DATEDIFF(d, Updated, GETDATE()) > DaysToKeep " +
                                            "ORDER BY Files.Id";
-                        foreach (var file in ctx.Files.SqlQuery(sql).AsEnumerable())
+                        foreach (var file in ctx.Files.SqlQuery(sql).ToArray())
                         {
-                            Logger.Info("Removing File {0}", file.FullName);
+                            Logger.Info("Removing {0} (includes {1} events)", file.FullName, file.EventCount);
                             ctx.Files.Remove(file);
                             ctx.SaveChanges();
                         }

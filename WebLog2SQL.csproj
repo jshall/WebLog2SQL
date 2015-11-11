@@ -69,7 +69,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="EventBuffer.cs" />
+    <Compile Include="Events.cs" />
     <Compile Include="File.cs" />
     <Compile Include="Migrations\Configuration.cs" />
     <Compile Include="Options.cs" />
