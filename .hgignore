@@ -1,8 +1,0 @@
-^bin$
-^obj$
-^packages$
-
-\.layout$
-\.suo$
-\.user$
-\.[Dd]esigner\.
