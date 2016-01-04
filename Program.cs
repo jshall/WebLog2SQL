@@ -34,12 +34,15 @@ namespace WebLog2SQL
                                            "JOIN Locations ON LocationName = Locations.Name " +
                                            "AND DATEDIFF(d, Updated, GETDATE()) > DaysToKeep " +
                                            "ORDER BY Files.Id";
+                        var originalTimeout = ctx.Database.CommandTimeout;
+                        ctx.Database.CommandTimeout = 300;
                         foreach (var file in ctx.Files.SqlQuery(sql).ToArray())
                         {
                             Logger.Info("Removing {0} (includes {1} events)", file.FullName, file.EventCount);
                             ctx.Files.Remove(file);
                             ctx.SaveChanges();
                         }
+                        ctx.Database.CommandTimeout = originalTimeout;
                     }
                 }
 
