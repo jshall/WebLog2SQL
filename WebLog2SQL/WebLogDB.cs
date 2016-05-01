@@ -12,5 +12,6 @@ namespace WebLog2SQL
         }
         public DbSet<File> Files { get; set; }
         public DbSet<Location> Locations { get; set; }
+        public DbSet<Event> Events { get; set; }
     }
 }

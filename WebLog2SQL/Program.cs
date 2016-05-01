@@ -30,15 +30,14 @@ namespace WebLog2SQL
                     locations = ctx.Locations.ToArray();
                     if (!Settings.Keep)
                     {
-                        const string sql = "SELECT Files.* FROM Files " +
-                                           "JOIN Locations ON LocationName = Locations.Name " +
-                                           "AND DATEDIFF(d, Updated, GETDATE()) > DaysToKeep " +
-                                           "ORDER BY Files.Id";
+                        var list = from f in ctx.Files.ToArray()
+                                   where (f.Updated - DateTimeOffset.Now).TotalDays > f.Location.DaysToKeep
+                                   select f;
                         var originalTimeout = ctx.Database.CommandTimeout;
                         ctx.Database.CommandTimeout = 300;
-                        foreach (var file in ctx.Files.SqlQuery(sql).ToArray())
+                        foreach (var file in list)
                         {
-                            Logger.Info("Removing {0} (includes {1} events)", file.FullName, file.EventCount);
+                            Logger.Info($"Removing {file.FullName} (includes {file.EventCount} events)");
                             ctx.Files.Remove(file);
                             ctx.SaveChanges();
                         }
@@ -46,13 +45,13 @@ namespace WebLog2SQL
                     }
                 }
 
-                File.Events.MaxRowsToBuffer = Settings.BufferSize;
+                File.Buffer.MaxRowsToBuffer = Settings.BufferSize;
                 Logger.Warn("Processing files");
                 Task.WaitAll((
                     from loc in locations.AsEnumerable()
                     from file in loc.GetFiles()
                     orderby file.CreationTime
-                    select File.From(loc, file).ImportAsync()
+                    select File.ImportAsync(loc, file)
                     ).ToArray());
             }
             catch (Exception ex) { Logger.Fatal(ex, "Fatal Error"); }
