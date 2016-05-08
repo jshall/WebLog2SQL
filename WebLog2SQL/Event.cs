@@ -1,40 +1,47 @@
 using System;
-using System.ComponentModel.DataAnnotations.Schema;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace WebLog2SQL
 {
     public class Event
     {
-        // ReSharper disable UnusedMember.Global
-        // ReSharper disable MemberCanBePrivate.Global
-        // ReSharper disable UnusedAutoPropertyAccessor.Global
         public long Id { get; set; }
         public long FileId { get; set; }
         public DateTimeOffset Timestamp { get; set; }
 
-        public File File { get; set; }
+        public virtual File File { get; set; }
+        public virtual ICollection<EventProperty> EventProperties { get; set; }
+            = new List<EventProperty>();
 
-        public Event() { }
-        // ReSharper restore UnusedAutoPropertyAccessor.Global
-        // ReSharper restore MemberCanBePrivate.Global
+        internal async Task FillAsync(WebLogDB ctx, string line)
+        {
+            var names = File.LastFields.Split(' ');
+            var values = line.Split(' ');
 
-        [NotMapped]
-        public string date
-        {
-            get { return Timestamp.ToString("yyyy-MM-dd"); }
-            set { Timestamp = DateTime.Parse(value) + Timestamp.TimeOfDay; }
-        }
-        [NotMapped]
-        public string time
-        {
-            get { return Timestamp.ToString("yyyy-MM-dd"); }
-            set { Timestamp = DateTime.Parse(value) + Timestamp.TimeOfDay; }
-        }
-        // ReSharper restore UnusedMember.Global
-
-        public Event(File file, string line)
-        {
-            throw new NotImplementedException();
+            for (var i = 0; i < names.Length; i++)
+                try
+                {
+                    if (names[i].Matches("date"))
+                        Timestamp =
+                            new DateTimeOffset(
+                                DateTime.Parse(values[i]) + Timestamp.ToOffset(File.Location.OffsetGMT).TimeOfDay,
+                                File.Location.OffsetGMT);
+                    else if (names[i].Matches("time"))
+                        Timestamp =
+                            new DateTimeOffset(
+                                Timestamp.ToOffset(File.Location.OffsetGMT).Date + TimeSpan.Parse(values[i]),
+                                File.Location.OffsetGMT);
+                    else
+                    {
+                        var prop = await Property.CreateAsync(names[i], values[i]);
+                        EventProperties.Add(new EventProperty { Event = this, PropertyId = prop.Id });
+                    }
+                }
+                catch (Exception ex) when (!Program.Break())
+                {
+                    throw new Exception("Failed to save property.", ex);
+                }
         }
     }
 }

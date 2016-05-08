@@ -14,6 +14,7 @@ namespace WebLog2SQL
         public string Name { get; set; }
         [Required]
         public string Root { get; set; }
+        public TimeSpan OffsetGMT { get; set; } = TimeSpan.Zero;
         public int DaysToKeep { get; set; }
         public string Exclude { get; set; }
         public string Filter { get; set; }

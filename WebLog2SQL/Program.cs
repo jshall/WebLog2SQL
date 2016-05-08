@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Data.Entity.Infrastructure;
+using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
@@ -37,12 +39,14 @@ namespace WebLog2SQL
                         ctx.Database.CommandTimeout = 300;
                         foreach (var file in list)
                         {
-                            Logger.Info($"Removing {file.FullName} (includes {file.EventCount} events)");
+                            Logger.Info($"Removing {file.FullName} (includes {file.Events?.Count ?? 0} events)");
                             ctx.Files.Remove(file);
                             ctx.SaveChanges();
                         }
                         ctx.Database.CommandTimeout = originalTimeout;
                     }
+                    foreach (var loc in locations)
+                        ((IObjectContextAdapter)ctx).ObjectContext.Detach(loc);
                 }
 
                 File.Buffer.MaxRowsToBuffer = Settings.BufferSize;
@@ -54,11 +58,22 @@ namespace WebLog2SQL
                     select File.ImportAsync(loc, file)
                     ).ToArray());
             }
-            catch (Exception ex) { Logger.Fatal(ex, "Fatal Error"); }
+            catch (Exception ex) when (!Break()) { Logger.Fatal(ex, "Fatal Error"); }
             finally { Logger.Warn("Done."); }
+        }
+
+        internal static bool Break()
+        {
+            if (!Debugger.IsAttached)
+                return false;
+            Debugger.Break();
+            return true;
         }
 
         internal static object GetField(this object obj, string name)
             => obj.GetType().InvokeMember(name, (BindingFlags)0x0436, null, obj, null);
+
+        internal static bool Matches(this string a, string b)
+           => string.Equals(a, b, StringComparison.CurrentCultureIgnoreCase);
     }
 }

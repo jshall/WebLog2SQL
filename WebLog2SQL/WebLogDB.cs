@@ -3,7 +3,7 @@ using WebLog2SQL.Migrations;
 
 namespace WebLog2SQL
 {
-    internal class WebLogDB : DbContext
+    public class WebLogDB : DbContext
     {
         public WebLogDB()
             : base(Program.Settings.ConnectionString)
@@ -13,5 +13,6 @@ namespace WebLog2SQL
         public DbSet<File> Files { get; set; }
         public DbSet<Location> Locations { get; set; }
         public DbSet<Event> Events { get; set; }
+        public DbSet<Property> Properties { get; set; }
     }
 }

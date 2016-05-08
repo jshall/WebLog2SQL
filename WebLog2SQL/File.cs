@@ -1,10 +1,8 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Data.Entity.Migrations;
-using EntityFramework.BulkInsert.Extensions;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -15,8 +13,6 @@ namespace WebLog2SQL
 {
     public class File
     {
-        // ReSharper disable MemberCanBePrivate.Global
-        // ReSharper disable UnusedAutoPropertyAccessor.Global
         public long Id { get; set; }
 
         [Required, StringLength(128), Index("IX_Files_FullName", 1, IsUnique = true), Index("IX_Files_Location")]
@@ -33,12 +29,9 @@ namespace WebLog2SQL
         public DateTimeOffset? Scanned { get; set; }
         public long BytesRead { get; set; }
         public string LastFields { get; set; }
-        public int EventCount { get; set; }
 
-        public Location Location { get; set; }
+        public virtual Location Location { get; set; }
         public virtual ICollection<Event> Events { get; set; }
-        // ReSharper restore UnusedAutoPropertyAccessor.Global
-        // ReSharper restore MemberCanBePrivate.Global
 
         public string FullName => $@"{LocationName}\{Path}\{Name}";
 
@@ -47,26 +40,26 @@ namespace WebLog2SQL
         public static async Task ImportAsync(Location loc, FileInfo fileInfo)
         {
             File file = null;
-            var lineCount = 0;
             var path = fileInfo.DirectoryName?.Replace(loc.Root ?? "", "").TrimStart('\\');
-            Pool.WaitAsync().Wait();
+            await Pool.WaitAsync();
             using (var ctx = new WebLogDB())
                 try
                 {
+                    loc = ctx.Locations.Single(l => l.Name == loc.Name);
                     file = ctx.Files.SingleOrDefault(f =>
-                            f.LocationName == loc.Name &&
-                            f.Path == path &&
-                            f.Name == fileInfo.Name)
+                           f.LocationName == loc.Name &&
+                           f.Path == path &&
+                           f.Name == fileInfo.Name)
                         ?? new File
                         {
-                            LocationName = loc.Name,
+                            Location = loc,
                             Path = path,
                             Name = fileInfo.Name,
                             Created = fileInfo.CreationTime
                         };
                     file.Updated = fileInfo.LastWriteTime;
                     ctx.Files.AddOrUpdate(file);
-                    ctx.SaveChanges();
+                    await ctx.SaveChangesAsync();
                     fileInfo.Refresh();
                     if (fileInfo.Length <= 0L || file.BytesRead >= fileInfo.Length) return;
                     using (var stream = fileInfo.Open(FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
@@ -74,7 +67,7 @@ namespace WebLog2SQL
                     using (var buffer = new Buffer(ctx, file))
                     {
                         stream.Position = file.BytesRead;
-                        for (lineCount = file.EventCount + 1; !txt.EndOfStream; lineCount++)
+                        while (!txt.EndOfStream)
                         {
                             var line = await txt.ReadLineAsync() ?? "";
                             file.BytesRead = stream.Position + (int)txt.GetField("charPos") - (int)txt.GetField("charLen");
@@ -82,20 +75,21 @@ namespace WebLog2SQL
                                 file.LastFields = line.Substring(9);
                             else if (line[0] == '#') continue;
                             else
-                                try { buffer.Add(new Event(file, line)); }
-                                catch (Exception ex)
+                                try { await buffer.Add(line); }
+                                catch (Exception ex) when (!Program.Break())
                                 {
-                                    Logger.Error(ex, "{0}:{1} Could not add to buffer: {2}", file.FullName, lineCount, line);
+                                    Logger.Error(ex, "{0} Could not add to buffer: {1}", file.FullName, line);
                                 }
                         }
+                        await buffer.Flush();
                     }
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (!Program.Break())
                 {
                     if (file == null)
                         Logger.Error(ex);
                     else
-                        Logger.Error(ex, "{0}:{1} {2}", file.FullName, lineCount, ex.Message);
+                        Logger.Error(ex, "{0} {1}", file.FullName, ex.Message);
                 }
                 finally
                 {
@@ -103,10 +97,11 @@ namespace WebLog2SQL
                 }
         }
 
-        internal class Buffer : Collection<Event>, IDisposable
+        internal class Buffer : IDisposable
         {
             private readonly File _file;
             private readonly WebLogDB _ctx;
+            private readonly ICollection<Event> _events = new List<Event>();
             public Buffer(WebLogDB ctx, File file)
             {
                 _ctx = ctx;
@@ -114,31 +109,29 @@ namespace WebLog2SQL
             }
 
             public static int MaxRowsToBuffer { get; set; }
-            public new void Add(Event item)
+            internal async Task Add(string line)
             {
-                if (item.File != null && item.File != _file)
-                    throw new ArgumentException("Event belongs to another File", nameof(item));
-                _file.Events.Add(item);
-                base.Add(item);
-                if (Count >= MaxRowsToBuffer)
-                    Flush();
+                var evt = new Event { File = _file };
+                await evt.FillAsync(_ctx, line);
+
+                _events.Add(evt);
+                if (_events.Count >= MaxRowsToBuffer)
+                    await Flush();
             }
 
-            public void Flush()
+            public async Task Flush()
             {
-                using (var trans = _ctx.Database.BeginTransaction())
-                {
-                    _ctx.BulkInsert(this, trans.UnderlyingTransaction);
-                    _ctx.SaveChanges();
-                    trans.Commit();
-                    Logger.Info("Imported {0,6:#,##0} events from {1}.", Count, _file.FullName);
-                }
-                Clear();
+                _file.Scanned = DateTimeOffset.Now;
+                _ctx.Events.AddRange(_events);
+                await _ctx.SaveChangesAsync();
+                Logger.Info("Imported {0,6:#,##0} events from {1}.", _events.Count, _file.FullName);
+                _events.Clear();
             }
 
             public void Dispose()
             {
-                Flush();
+                if (_events.Count <= 0) return;
+                throw new InvalidOperationException("Please flush the Buffer before disposing.");
             }
         }
     }
