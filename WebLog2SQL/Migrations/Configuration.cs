@@ -7,7 +7,7 @@ namespace WebLog2SQL.Migrations
 {
     internal sealed class Configuration : DbMigrationsConfiguration<WebLogDB>
     {
-        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+        private static readonly ILogger Logger = LogManager.GetCurrentClassLogger();
         public Configuration()
         {
             AutomaticMigrationsEnabled = true;

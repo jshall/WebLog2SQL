@@ -5,7 +5,7 @@ namespace WebLog2SQL
 {
     public class WebLogDB : DbContext
     {
-        public WebLogDB() : this(Program.Settings.ConnectionString) { }
+        public WebLogDB() : this(Options.DefaultConnectionString) { }
         public WebLogDB(string connectionString)
             : base(connectionString)
         {

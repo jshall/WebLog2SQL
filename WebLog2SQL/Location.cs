@@ -22,22 +22,5 @@ namespace WebLog2SQL
         public virtual ICollection<File> Files { get; set; }
 
         private DateTimeOffset _cutoff;
-        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
-
-        public IEnumerable<FileInfo> GetFiles()
-        {
-            var dir = new DirectoryInfo(Root);
-            if (!dir.Exists)
-            {
-                Logger.Warn("Directory not found: {0}", dir.FullName);
-                return new FileInfo[] { };
-            }
-            _cutoff = DateTime.Now.AddDays(-DaysToKeep);
-            var ex = string.IsNullOrWhiteSpace(Exclude) ? null
-                : new Regex(Exclude, RegexOptions.Compiled | RegexOptions.IgnoreCase);
-            return dir.EnumerateFiles(Filter ?? "*.log", SearchOption.AllDirectories)
-                      .Where(file => file.LastWriteTime > _cutoff)
-                      .Where(file => !(ex?.Match(file.FullName).Success ?? false));
-        }
     }
 }

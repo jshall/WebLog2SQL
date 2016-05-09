@@ -1558,7 +1558,7 @@
         </xs:attribute>
         <xs:attribute name="useSystemNetMailSettings" type="xs:boolean">
           <xs:annotation>
-            <xs:documentation>Indicates whether the default Settings from System.Net.MailSettings should be used.</xs:documentation>
+            <xs:documentation>Indicates whether the default Settings from System.Net.MailOp should be used.</xs:documentation>
           </xs:annotation>
         </xs:attribute>
         <xs:attribute name="pickupDirectoryLocation" type="xs:string">

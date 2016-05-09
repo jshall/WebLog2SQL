@@ -71,6 +71,7 @@
   <ItemGroup>
     <Compile Include="Event.cs" />
     <Compile Include="File.cs" />
+    <Compile Include="Importer.cs" />
     <Compile Include="Migrations\Configuration.cs" />
     <Compile Include="Options.cs" />
     <Compile Include="Location.cs" />
