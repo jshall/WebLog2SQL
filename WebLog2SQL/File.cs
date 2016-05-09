@@ -72,8 +72,8 @@ namespace WebLog2SQL
                         {
                             var line = await txt.ReadLineAsync() ?? "";
                             file.BytesRead = stream.Position + (int)txt.GetField("charPos") - (int)txt.GetField("charLen");
-                            if (line.StartsWith("#Fields: "))
-                                file.LastFields = line.Substring(9);
+                            if (line.StartsWith("#Fields:"))
+                                file.LastFields = line.Substring(8);
                             else if (line[0] == '#') continue;
                             else
                                 try { await buffer.Add(line); }
