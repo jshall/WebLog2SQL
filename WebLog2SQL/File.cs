@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Data.Entity;
 using System.Data.Entity.Migrations;
 using System.IO;
 using System.Linq;
@@ -15,13 +16,13 @@ namespace WebLog2SQL
     {
         public long Id { get; set; }
 
-        [Required, StringLength(128), Index("IX_Files_FullName", 1, IsUnique = true), Index("IX_Files_Location")]
+        [MaxLength(128), Index("IX_FullName", 1, IsUnique = true), Index]
         public string LocationName { get; set; }
 
-        [Required, StringLength(512), Index("IX_Files_FullName", 2, IsUnique = true), Index("IX_Files_Path")]
+        [MaxLength(512), Index("IX_FullName", 2, IsUnique = true), Index]
         public string Path { get; set; }
 
-        [Required, StringLength(128), Index("IX_Files_FullName", 3, IsUnique = true), Index("IX_Files_Name")]
+        [MaxLength(128), Index("IX_FullName", 3, IsUnique = true), Index]
         public string Name { get; set; }
 
         public DateTimeOffset Created { get; set; }
@@ -45,20 +46,20 @@ namespace WebLog2SQL
             using (var ctx = new WebLogDB())
                 try
                 {
-                    loc = ctx.Locations.Single(l => l.Name == loc.Name);
-                    file = ctx.Files.SingleOrDefault(f =>
-                           f.LocationName == loc.Name &&
-                           f.Path == path &&
-                           f.Name == fileInfo.Name)
-                        ?? new File
+                    file = await ctx.Files.SingleOrDefaultAsync(f =>
+                        f.LocationName == loc.Name &&
+                        f.Path == path &&
+                        f.Name == fileInfo.Name);
+                    loc = await ctx.Locations.FindAsync(loc.Name);
+                    if (file == null)
+                        ctx.Files.Add(file = new File
                         {
                             Location = loc,
                             Path = path,
                             Name = fileInfo.Name,
                             Created = fileInfo.CreationTime
-                        };
+                        });
                     file.Updated = fileInfo.LastWriteTime;
-                    ctx.Files.AddOrUpdate(file);
                     await ctx.SaveChangesAsync();
                     fileInfo.Refresh();
                     if (fileInfo.Length <= 0L || file.BytesRead >= fileInfo.Length) return;

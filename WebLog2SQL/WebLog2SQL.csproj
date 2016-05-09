@@ -70,7 +70,6 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Event.cs" />
-    <Compile Include="EventProperty.cs" />
     <Compile Include="File.cs" />
     <Compile Include="Migrations\Configuration.cs" />
     <Compile Include="Options.cs" />

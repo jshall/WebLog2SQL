@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Data.Entity;
+using System.Data.Entity.Infrastructure;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
@@ -16,28 +17,34 @@ namespace WebLog2SQL
         public string Name { get; set; }
         public string Value { get; set; }
 
-        public virtual ICollection<EventProperty> EventProperties { get; set; }
+        public virtual ICollection<Event> Events { get; set; }
 
-        private static readonly WebLogDB Context = new WebLogDB();
-        private static readonly SemaphoreSlim Lock = new SemaphoreSlim(1);
-        private static readonly Encoding Enc = new UnicodeEncoding();
-        internal static async Task<Property> CreateAsync(string name, string value)
+        internal static class Helper
         {
-            byte[] id;
-            using (var sha = new SHA1CryptoServiceProvider())
+            private static readonly WebLogDB Context = new WebLogDB();
+            private static readonly SemaphoreSlim Lock = new SemaphoreSlim(1);
+            private static readonly Encoding Enc = new UnicodeEncoding();
+            internal static async Task<Property> CreateAsync(WebLogDB ctx, string name, string value)
             {
-                var bytes = Enc.GetBytes(name).ToList();
-                bytes.Add(0);
-                bytes.AddRange(Enc.GetBytes(value));
-                id = sha.ComputeHash(bytes.ToArray());
+                byte[] id;
+                using (var sha = new SHA1CryptoServiceProvider())
+                {
+                    var bytes = Enc.GetBytes(name).ToList();
+                    bytes.Add(0);
+                    bytes.AddRange(Enc.GetBytes(value));
+                    id = sha.ComputeHash(bytes.ToArray());
+                }
+                await Lock.WaitAsync();
+                var prop = await Context.Properties.FindAsync(id);
+                var isNew = prop == null;
+                if (isNew)
+                {
+                    Context.Properties.Add(new Property {Id = id, Name = name, Value = value});
+                    await Context.SaveChangesAsync();
+                }
+                Lock.Release();
+                return await ctx.Properties.FindAsync(id);
             }
-            await Lock.WaitAsync();
-            var prop = await Context.Properties.FirstOrDefaultAsync(p => p.Id == id);
-            if (prop == null)
-                Context.Properties.Add(prop = new Property { Id = id, Name = name, Value = value });
-            await Context.SaveChangesAsync();
-            Lock.Release();
-            return prop;
         }
     }
 }

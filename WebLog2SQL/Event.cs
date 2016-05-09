@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace WebLog2SQL
@@ -11,8 +12,7 @@ namespace WebLog2SQL
         public DateTimeOffset Timestamp { get; set; }
 
         public virtual File File { get; set; }
-        public virtual ICollection<EventProperty> EventProperties { get; set; }
-            = new List<EventProperty>();
+        public virtual ICollection<Property> Properties { get; set; }
 
         internal async Task FillAsync(WebLogDB ctx, string line)
         {
@@ -34,8 +34,8 @@ namespace WebLog2SQL
                                 File.Location.OffsetGMT);
                     else
                     {
-                        var prop = await Property.CreateAsync(names[i], values[i]);
-                        EventProperties.Add(new EventProperty { Event = this, PropertyId = prop.Id });
+                        if (Properties == null) Properties = new List<Property>();
+                        Properties.Add(await Property.Helper.CreateAsync(ctx, names[i], values[i]));
                     }
                 }
                 catch (Exception ex) when (!Program.Break())

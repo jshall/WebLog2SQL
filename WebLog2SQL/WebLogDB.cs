@@ -5,8 +5,9 @@ namespace WebLog2SQL
 {
     public class WebLogDB : DbContext
     {
-        public WebLogDB()
-            : base(Program.Settings.ConnectionString)
+        public WebLogDB() : this(Program.Settings.ConnectionString) { }
+        public WebLogDB(string connectionString)
+            : base(connectionString)
         {
             Database.SetInitializer(new MigrateDatabaseToLatestVersion<WebLogDB, Configuration>());
         }
