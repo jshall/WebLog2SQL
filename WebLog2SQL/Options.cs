@@ -13,7 +13,7 @@ namespace WebLog2SQL
         public bool Keep { get; set; }
 
         [Option('b', "BufferSize")]
-        public int BufferSize { get; set; } = 10000;
+        public int BufferSize { get; set; } = 100;
 
         [HelpOption]
         public string GetUsage()

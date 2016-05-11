@@ -1,10 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-using System.IO;
-using System.Linq;
-using System.Text.RegularExpressions;
-using NLog;
 
 namespace WebLog2SQL
 {
@@ -20,7 +16,5 @@ namespace WebLog2SQL
         public string Filter { get; set; }
 
         public virtual ICollection<File> Files { get; set; }
-
-        private DateTimeOffset _cutoff;
     }
 }
